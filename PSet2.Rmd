@@ -2,6 +2,7 @@
 title: "EDAV Fall 2019 PSet 2"
 author: 'null'
 output: rmarkdown::github_document
+time :2019-10-02
 ---
 
 Read *Graphical Data Analysis with R*, Ch. 4, 5
