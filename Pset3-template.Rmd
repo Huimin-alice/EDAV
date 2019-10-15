@@ -1,0 +1,335 @@
+---
+title: "EDAV Fall 2019 PSet 3"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Read *Graphical Data Analysis with R*, Ch. 6, 7
+
+Grading is based both on your graphs and verbal explanations. Follow all best practices as discussed in class.
+
+Data cleaning: for many of the questions, you will have to clean up the data more than in past assignments. Labels do not have to perfect but they have to be legible. Often it is helpful to shorten or abbreviate labels: this can be done before plotting or at times within the plot functions. You may make any changes to the data as appropriate before plotting, including renaming column names and the like. Be sure though to include all adjustments in your scripts.
+
+```{r setup, include=FALSE}
+ # keep this chunk in your .Rmd file
+ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+    
+### 1. Coal Emissions
+
+Data: https://datadiscovery.nlm.nih.gov/Environmental-Health/TOXMAP-EPA-Clean-Air-Markets-2016-Coal-Emissions/n97u-wtk7
+
+(OK to manually download `.csv` file)
+
+(a) Using `parcoords::parcoords()`, create an interactive parallel coordinate plot of `SO2`, `NOx`, `CO2`, `Heat Input` and `Gross Load`. Each line in the plot should represent one coal plant. Note any patterns.
+```{r}
+
+
+library(dplyr)
+
+library(readxl)
+
+library(parcoords)
+setwd("~/EDAV")
+MyData <- read.csv(file="TOXMAP_-_EPA_Clean_Air_Markets_-_2016_Coal_Emissions.csv", header=TRUE, sep=",")
+
+
+
+```
+```{r}
+
+parcoords(data=MyData[,c(5,7,9,11,12)])
+
+
+```
+(b) Create a second interactive parallel coordiante plot, with the lines colored by state. Include only the states with more than 15 plants. Do any new patterns emerge? Explain briefly.
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(splitstackshape)
+df=data.frame(location=MyData$Location)
+df<-cSplit(df,"location", "\n")
+
+MyData<-cbind(MyData, State=df$location_1)
+MyData <- na.omit(MyData)
+MyData<-MyData %>%
+     group_by(State) %>%
+     mutate(plants = n()) %>%
+     filter(plants > 15)
+
+```
+
+```{r}
+
+
+
+
+
+parcoords(data=MyData[,c(5,7,9,11,12,14)], 
+          rownames=FALSE,
+          color=list(
+            colorScale="scaleOrdinal",
+            colorBy="State",
+            colorScheme="schemeCategory10"
+          ),
+          withD3=TRUE,    
+          brushMode = "1D-axes",
+          reorderable = TRUE)
+```
+(c) What do `SO2`, `NOx` and `CO2` stand for? Briefly describe why each is harmful.
+
+
+SO2 is oxygen saturation, a chemical compound. In the atmosphere, the concentration of sulfur dioxide may a potential impact on the human body, and it will converted into sulfuric acid mist or sulfate aerosol, which result to environmental acidification. 
+
+NOx is Nitrogen oxides. Nitrogen oxides can irritate the lungs, making it harder to resist respiratory diseases such as colds. People with respiratory problems, such as asthma, are more susceptible to nitrogen dioxide. The toxic fumes formed by the reaction of nitrogen oxides and hydrocarbons in automobile exhausts by ultraviolet radiation are called photochemical smog. Photochemical smog has a special odor, irritating the eyes, harming plants, and reducing atmospheric visibility. In addition, nitrogen oxides Nitric acid and nitrous acid formed by reaction with water in the air are components of acid rain.
+
+CO2 is carbon dioxide. Normal concentrations of carbon dioxide have no significant effect on the environment. But excessive carbon dioxide can cause atmospheric greenhouse effects. Its possible role is to cause frequent tropical and temperate droughts and floods, as well as melting icebergs, rising sea levels, and submerged coastal deltas.
+
+The plot shows that in if two or more of this three gas concentration is high, the heat input and gross load will be high also. It means those three things work together to increase the heat input and gross load, which do harm to our environment.
+
+### 2. Planets
+
+Using **rvest**, scrape the data from this table: https://nssdc.gsfc.nasa.gov/planetary/factsheet/ (hint: `html_table` is helpful). Remove `MOON` data. Then, using `GGally::ggparcoord()`, create two parallel coordinate plots of the numerical variables in the dataset, one colored by the value of `Ring System?` and one colored by planet name. In both cases, each line should represent one planet. Use `coord_flip` so the variable names are easier to read.  Describe any patterns you find.
+```{r}
+library(ggplot2)
+library(GGally)
+library(robotstxt)
+library(rvest)
+
+
+# read data
+table <- read_html( "https://nssdc.gsfc.nasa.gov/planetary/factsheet/") %>% 
+  html_nodes("table") %>% 
+  html_table(fill = TRUE)
+
+# data cleaning
+df2 <- as.data.frame(table)
+planetnames<- df2[1,]
+colnames(df2) <- planetnames # updating column names
+colnames(df2)[1] = "Measurement"
+df2<-df2[c(-1,-18,-22),]  # i.e. removed firsta and last row which contains the planet name
+                          # also remove  Surface Pressure (bars) row values since 4 values are unkonwn out of 9
+
+df2 <- subset(df2, select = -MOON)
+df2<- t(df2)
+colnames(df2) <-df2[1,]
+df2<-df2[-1,]
+colnames(df2)[18] <- "Ring_System" # rename the column's name since it cannot parsed correctly
+
+planetnames <- as.data.frame(rownames(df2)) # i.e. add planet names to color it by its name
+colnames(planetnames)[1] = "Planet_Names"
+df2<- cbind(df2,planetnames)  
+
+# two parallel coordinates plot
+ggparcoord(df2, alphaLines = 0.9, columns = 1:17, splineFactor = 10, groupColumn = "Planet_Names", scale = "uniminmax") +
+  coord_flip()  # i.e. select only numeric variables
+
+
+ggparcoord(df2, alphaLines = .5, columns = 1:18, splineFactor = 10, groupColumn = "Ring_System", scale = "uniminmax") +
+  coord_flip()  # i.e. select only numeric variables and column for ring system to group by the system
+
+
+# not neg bewtween Distance from the Sun and Aphelion
+ggparcoord(df2, alphaLines = .9, columns = c(8,10), splineFactor = 10,  groupColumn = "Planet_Names", scale = "uniminmax") 
+
+# nearly parallel lines bewtween Distance from the Sun and Perihelion
+ggparcoord(df2, alphaLines = .9, columns = c(8,9), splineFactor = 10,  groupColumn = "Planet_Names", scale = "uniminmax") 
+# plotting between two variables that seem to have clear patterns
+# neg cor between mass and orbital period
+ggparcoord(df2, alphaLines = .9, columns = c(1,11), splineFactor = 10,  groupColumn = "Planet_Names", scale = "uniminmax") 
+
+
+# neg. cor. between  rotational period and orbital velocity 
+ggparcoord(df2, alphaLines = .9, columns = c(6,12), splineFactor = 10,  groupColumn = "Planet_Names", scale = "uniminmax") 
+```
+
+Since the varaiable Distance from Sun is average value between Perihelion and Aphelion, points closest and furthest from the Sun, it is not surprise that association between Distance from the Sun and Aphelion would result in parallel lines since there should not exists a neagtive correlation. Similar result shows between association between  Distance from the Sun and Perihelion that except among Mercury, Pluto, and Neptue which forms a twist, most of the other planets form parallel lines (As clearly depicted on the last two plots. This general idea is visible from the first plot where it shows the parallel coordinate plots of the all planets vs the measurements in that middle section from Distance from the Sun to Aphelion, except among the Mercury, Pluto, and Neptune, all the other planets do not form twists.
+
+Besides these measures, it seems among other measurements, there exist some degree of negative correlation since twists are formed between adjacent measurements. Although in order to visualize negative correlation between the measurements, each pair of the variables should be compared (i.e. since the first and second plot can see twists only between two adjacent measurements). I indeed tried each pair but did not include all the plots of pairs (only include the ones that show clear twist) since there would be too many. Instead, as shown on the two graphs, following the parallel coordinate plots grouped by the ring system, there is a clear negative correlation between mass and orbital period as there is a clear twist. Also, it is clear that rotational period and orbital velocity is neatively corrleative due to apparent twist.
+
+### 3. Heart Disease
+
+Data: four data frames that begin with `heart_disease` in the **ucidata** package
+
+Packages: You may use **vcd** or **ggmosaic**.
+
+(a) Create three mosaic plots, each involving two categorical variables from `heart_disease_cl` and interpret the plots. (You may reuse variables, for example X ~ Y and X ~ Z).
+
+Part(a)
+```{r, echo=TRUE, fig.align="center", fig.width=12}
+library(ucidata)
+library(vcd)
+
+#heart_disease_cl
+#str(heart_disease_cl)
+#summary(heart_disease_cl)
+
+df3a <- heart_disease_cl
+
+# between sex and cp variable
+df3a1 <-  subset(df3a, select = c("sex","cp"))
+df3a1["Freq"] <-1 # add frequency column of values 1
+df3a1 <- na.omit(df3a1) 
+mosaic(cp ~sex, direction = c("v", "h"),
+        gp = gpar(fill = c("lightyellow", "lightblue")),
+       spacing = spacing_equal(sp = unit(0.5, "lines")),
+       main = "Mosaic plot between sex and cp variables",
+       labeling = labeling_border(rot_labels = c(0, 0, 0, 45)),
+       df3a1)
+
+# between sex and thal variable
+df3a2 <-subset(df3a, select = c("sex","restecg"))
+df3a2["Freq"] <-1 # add frequency column of values 1
+df3a2 <- na.omit(df3a2) 
+mosaic(restecg ~sex , direction = c("v", "h"),
+        gp = gpar(fill = c("lightyellow", "lightblue")),
+       spacing = spacing_equal(sp = unit(0.5, "lines")),
+       main = "Mosaic plot between sex and restecg variables",
+       labeling = labeling_border(rot_labels = c(0, 0, 0, 45)),
+       df3a2)
+
+
+# between sex and exang variable
+df3a3 <-subset(df3a, select = c("sex","exang"))
+df3a3["Freq"] <-1 # add frequency column of values 1
+df3a3 <- na.omit(df3a3) 
+mosaic(exang ~sex, direction = c("v", "h"),
+        gp = gpar(fill = c("lightyellow", "lightblue")),
+       spacing = spacing_equal(sp = unit(0.5, "lines")),
+       main = "Mosaic plot between sex and exang variables",
+       labeling = labeling_border(rot_labels = c(0, 0, 0, 0)),
+       df3a3)
+```
+
+The frist mosaic plot, which compares between the sex variable and cp (chest pain type), it shows that for boh men and women, the chest pain type is in a decreasing order of asymptomatic,non-anginal pain, atypical angina, typical angina. So, for both men and women, the most pain type is asymptomatic while the least pain type is  typical angina.
+While the general orders of proportion of pain type is same for both men and women, pain types of asymptomatic and typical angina are higher for men than women, proportionally to each of their respectice sample size, while pain types of non-anginal and atypical angina are less for men than women, porportionally to each of their respective sample size.
+
+For the second mosaic plot,  which compares between the sex variable and restecg (resting electrocardiographic results, it shows that for both men and women, both men and women mostly show the test result of either being normal or being "prrobable/definite hypertropy"(i.e. showing probable or definite left ventricular hypertrophy by Estes' criteria). While proportion of the test results having normal or "probable/definit hypertropy" are slightly differ between men and women, they are roughly same. Similarly, for both women and men, they do not tend to have the test results being ST-T wave abnormality, which occurs when T wave inversions and/or ST elevation or depression of > 0.05 mV. Unlike the two previous test results, women proprtion of women having this result is much larger than that of men, respective each sample size of women and men.
+
+For the third mosaic plot,  which compares between the sex variable and exang (exercise induced angina, (1 = yes; 0 = no)), it shows that for both men and women, proportion of whether induced angina being exercised is lower (i.e. both women and men tend to not receive induced angina). Although general tendency is same between sex, women's proportion of exercising induced angina is higher than that of men, each relative to their respective sample size.
+
+
+(b) Combine the four heart disease datasets and create a mosaic plot showing chest pain by sex and location. Describe any patterns.
+
+```{r, echo=TRUE, fig.align="center", fig.width=12}
+library(dplyr)
+
+# only select variables in interst, and  add its location
+df_cl <- subset(heart_disease_cl, select = c("sex","num"))
+df_cl["location"] <- "Cleveland"
+df_hu <- subset(heart_disease_hu, select = c("sex","num"))
+df_hu["location"] <- "Hungary"
+df_va <- subset(heart_disease_va, select = c("sex","num"))
+df_va["location"] <- "VA_Long_Beach"
+df_ch <- subset(heart_disease_ch, select = c("sex","num"))
+df_ch["location"] <- "Switzerland"
+
+df3b <- rbind(df_cl,df_hu,df_va,df_ch) #bind 4 data frames into one
+df3b["chest_pain"] <- ifelse(df3b$num>0, "Yes", "No") # add a new column whether
+                                                      # a patient has a heart pain
+                                    # Since it was noted not to alter original data
+
+df3b <- subset(df3b, select =c("sex", "location", "chest_pain"))
+mosaic(chest_pain  ~ location + sex, direction = c("v", "v", "h"),
+        gp = gpar(fill = c("lightyellow", "lightblue")),
+       spacing = spacing_equal(sp = unit(0.5, "lines")),
+       main = "Mosaic plot showing chest pain by sex and location",
+       labeling = labeling_border(rot_labels = c(0, 0, 45, 0)),
+       df3b)
+
+
+#i.e. to see how many women were responded in Switzerland
+summarize(group_by(df_ch, sex), Freq = n()) 
+#i.e. to see how many women were responded in VA Long Beach
+summarize(group_by(df_va, sex), Freq = n()) 
+
+```
+
+From the plot above, first, for each of the four regions, there are more responses from men than from women. This is becasuse width of the boxes for female is shorter than that of male for each of the 4 regions.
+Particularly, as shown on the sub table shown above, for Switzerland, there only records from 10 women compared to 113 records from men. Similiarly, there were only 6 records from women than 194 records from men in VA Long Beach region.
+
+Interestingly, it is clear from first sight that in Switzerland, both women and men has large proportion of having chest pain compared to both women and men from other regions. Particularly, nearly most of the women in Switzerland responded to have a chest pain (this could not represent the whole women popoulation from Switzerland since the proportion is computed from sample with 10 women). Same applies to responses of chest pain from mwomen in VA Long Beach since thehre were only 6 samples recorded for women (i.e. should not trust the seemingly evenly distribution of the response from women from VA Long Beach).
+
+It is also interesting to see that in both cleveland and Hungary, while men's response whether they have a chest pain is roughly evenly distributed (i.e. since each box represesnts a proportion, in both Cleveland and Hungary, for men, box is didvided up at nearly at midpoint). Also, for the two regions, there are more responses from women having a chest pain.
+
+
+### 4. District 3 Elementary Schools
+
+Recently, there has been much debate about the lack of racial and economic diversity at Manhattan District 3 elementary schools, part of a larger and long-standing controversy about iniquities in the New York City public school system as a whole.
+
+The *New York Times* article, "Rezoning Plan to Remake 3 Upper West Side Schools Will Proceed, City Says,"  (https://www.nytimes.com/2016/11/10/nyregion/rezoning-plan-for-3-upper-west-side-schools-will-proceed-city-says.html) (2016-11-10) identifies the 11 elementary schools in Manhattan District 3.
+
+For this question, we will analyze parent survey results for these schools.
+
+Data: https://www.schools.nyc.gov/about-us/reports/school-quality/nyc-school-survey
+
+
+(a) Choose one of the likert style questions from the 2019 parent survey and use a diverging stacked bar chart to show results for the 11 schools identified in the article referenced above.
+
+In this question, I manually download the file and save the sheet I need as an .csv file.
+```{r}
+setwd("~/EDAV")
+df <- read_excel("2019-public-data-file_parent.xlsx", sheet = "Parent # of Resp")
+
+data11<-filter(df, DBN=="03M165"|DBN=="03M145"|DBN== "03M163"|DBN== "03M075"|DBN== "03M084"|DBN== "03M166"|DBN== "03M009" |DBN=="03M087"|DBN== "03M199"|DBN=="03M191" |DBN=="03M452")
+newdata <- data.frame(data11[1],data11[4:7])
+newdata[,c(2:5)] <- sapply(newdata[,c(2:5)], as.numeric)
+names(newdata)[2:5] <- c("Strongly Disagree", "Disagree", "Agree", "Strongly Agree")
+newdata[,c(2:5)] <- newdata[,c(2:5)] / rowSums(newdata[,c(2:5)]) * 100
+
+```
+```{r}
+HH::likert(DBN~.,newdata, positive.order = TRUE,
+           main = "School staff regularly communicate with me about how I can help my child learn.",
+           xlab = "Percent",
+           ylab = "DBN")
+```
+(b) Choose a question that was asked in 2014 and 2019 and compare results for the three schools discussed most in the article: P.S. 199, P.S. 191, and P.S. 452. You may use two separate diverging stacked bar charts or combine all the information in one.
+```{r}
+setwd("~/EDAV")
+df2014<- read_excel("2014_20School_20Survey.xlsx", sheet = "GenEd - Parent %")
+
+data2014<-filter(df2014, DBN== "03M199"|DBN=="03M191" |DBN=="03M452")
+newdata2014 <- data.frame(data2014[1],data2014[64:68])
+newdata2014[is.na(newdata2014)] <- 0
+newdata2014<-newdata2014[,c(1,5,4,6,3,2)]
+newdata2014[,c(2:6)] <- sapply(newdata2014[,c(2:6)], as.numeric)
+names(newdata2014)[2:6] <- c("Strongly Disgree", "Disagree","I don't know", "Agree", "Strongly Agree")
+newdata2014[,c(2:6)] <- newdata2014[,c(2:6)] / rowSums(newdata2014[,c(2:6)]) * 100
+
+
+data2019<-filter(df, DBN== "03M199"|DBN=="03M191" |DBN=="03M452")
+newdata2019 <- data.frame(data2019[1],data2019[77:81])
+newdata2019<-newdata2019[,c(1,2,3,6,4,5)]
+newdata2019[,c(2:6)] <- sapply(newdata2019[,c(2:6)], as.numeric)
+names(newdata2019)[2:6] <- c("Strongly Disgree", "Disagree","I don't know", "Agree", "Strongly Agree")
+newdata2019[,c(2:6)] <- newdata2019[,c(2:6)] / rowSums(newdata2019[,c(2:6)]) * 100
+
+
+```
+```{r}
+HH::likert(DBN~., newdata2014, positive.order = FALSE,
+           main = "2014 At this school my child is safe.",
+           xlab = "Percent",
+           ylab = "DBN")
+HH::likert(DBN~., newdata2019, positive.order = FALSE,
+           main = "2019 At this school my child is safe.",
+           xlab = "Percent",
+           ylab = "DBN")
+
+
+```
+(c) Interpret your findings of (b) in light of the reputations of the schools as presented in the article. Are they surprising or what you would have expected?
+
+
+In 2014, hardly did disagree and strong disagree appear in the response of parents to the aspect of safe issue for P.S. 452. For P.S. 199, there exists disagree but no strong disagree, which reflects the security in P.S. 199 is relatively lower than in P.S. 452. P.S. 191 have the highest disagree and strong disagree rate, which means it is dangerous than those other schools. Also, the ratio of Strongly agree is highest in P.S. 452 while P.S. 191 has the lowest ratio.
+
+The article states that the P.S. 191 consists of a lot of black and Hispanic. As the article said, this school has low standardized test scores and was once labeled “persistently dangerous” by New York State. While the other two schools almost serve for wealthy white children. It parallels to the outcome of 2014.
+
+In 2019, there is a large increase in disagree and strong disagree ratio in P.S.452. Also disagree ratio increases in P.S.199 while P.S. 191 seem has no dramatically change in disagree ratio. However, the strong agree rates in  P.S.452 and P.S.199 are still higher than that in P.S. 191. 
+
+It is because many students that should study in P.S. 452 and P.S.199 now study in  P.S.191. At the same time, students that should study in P.S.191 now in  P.S.199 and  P.S.452, who are poor and dangerous, which cause a increase in the  increase in disagree and strong disagree ratio in P.S.452 and P.S. 191.
+
+The result is not surprising. 
